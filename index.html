@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Leonardo's Tretboot</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 14px 16px; pointer-events: none; z-index: 10;
+  }
+  .badge {
+    font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.95);
+    background: rgba(0,0,0,0.45); border-radius: 20px;
+    padding: 6px 14px; letter-spacing: 0.3px;
+    border: 1px solid rgba(255,255,255,0.15);
+    transition: opacity 0.2s;
+  }
+  #bottom-ui {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; padding-bottom: 18px; pointer-events: none; z-index: 10;
+  }
+  #speed-wrap { display: flex; align-items: center; gap: 8px; }
+  #speed-bar-bg {
+    width: 130px; height: 7px; background: rgba(255,255,255,0.2);
+    border-radius: 4px; overflow: hidden;
+  }
+  #speed-bar-fill {
+    height: 100%; width: 0%; background: linear-gradient(90deg, #f0c040, #e07020);
+    border-radius: 4px; transition: width 0.08s;
+  }
+  #hint {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 14px; color: rgba(255,255,255,0.9);
+    background: rgba(0,0,0,0.55); padding: 10px 18px;
+    border-radius: 14px; text-align: center; line-height: 1.6;
+    z-index: 20; pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  #tap-left, #tap-right {
+    position: fixed; top: 0; bottom: 70px; width: 50%; z-index: 5;
+  }
+  #tap-left { left: 0; }
+  #tap-right { right: 0; }
+  #compass {
+    position: fixed; top: 14px; right: 16px;
+    width: 52px; height: 52px; z-index: 10; pointer-events: none;
+  }
+  #collision-flash {
+    position: fixed; inset: 0; background: rgba(255,60,60,0);
+    pointer-events: none; z-index: 30;
+    transition: background 0.1s;
+  }
+</style>
+</head>
+<body>
+
+<div id="tap-left"></div>
+<div id="tap-right"></div>
+<div id="collision-flash"></div>
+
+<div id="ui">
+  <span class="badge" id="badge-left">👈 Links</span>
+  <span style="width:52px"></span>
+</div>
+<div id="bottom-ui">
+  <div id="speed-wrap">
+    <span class="badge" style="font-size:11px;">Geschwindigkeit</span>
+    <div id="speed-bar-bg"><div id="speed-bar-fill"></div></div>
+  </div>
+  <span class="badge" id="badge-right" style="align-self:flex-end; margin-right:16px;">Rechts 👉</span>
+</div>
+<svg id="compass" viewBox="0 0 52 52">
+  <circle cx="26" cy="26" r="25" fill="rgba(0,0,0,0.4)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+  <text x="26" y="13" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="9" font-family="sans-serif">N</text>
+  <line id="compass-needle" x1="26" y1="26" x2="26" y2="8" stroke="#f04040" stroke-width="2.5" stroke-linecap="round"/>
+  <line id="compass-tail" x1="26" y1="26" x2="26" y2="38" stroke="#aaa" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="26" cy="26" r="3" fill="#fff"/>
+</svg>
+<div id="hint">Wechselnd links/rechts tippen zum Starten<br>📱 Handy neigen zum Lenken</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// Lighting
+const ambient = new THREE.AmbientLight(0xfff0d0, 0.6);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xfff5e0, 1.4);
+sun.position.set(80, 120, 60);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 400;
+sun.shadow.camera.left = -80;
+sun.shadow.camera.right = 80;
+sun.shadow.camera.top = 80;
+sun.shadow.camera.bottom = -80;
+scene.add(sun);
+
+// Sky
+scene.background = new THREE.Color(0x87ceeb);
+
+// Water
+const waterGeo = new THREE.PlaneGeometry(600, 600, 80, 80);
+const waterMat = new THREE.MeshPhongMaterial({
+  color: 0x1a6fa0, specular: 0x88ccff, shininess: 60,
+  side: THREE.DoubleSide, transparent: true, opacity: 0.92
+});
+const water = new THREE.Mesh(waterGeo, waterMat);
+water.rotation.x = -Math.PI / 2;
+water.receiveShadow = true;
+scene.add(water);
+
+// Wave animation verts
+const wPos = waterGeo.attributes.position;
+const wOrigY = [];
+for (let i = 0; i < wPos.count; i++) wOrigY.push(wPos.getY(i));
+
+// ── BOAT ──
+const boatGroup = new THREE.Group();
+scene.add(boatGroup);
+
+// Hull
+function makeHull() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-1.4, 0.5);
+  shape.lineTo(1.4, 0.5);
+  shape.lineTo(1.8, 0);
+  shape.lineTo(1.4, -0.5);
+  shape.lineTo(-1.4, -0.5);
+  shape.lineTo(-1.8, 0);
+  shape.closePath();
+  const extSettings = {
+    depth: 0.5,
+    bevelEnabled: true,
+    bevelThickness: 0.06,
+    bevelSize: 0.06,
+    bevelSegments: 2
+  };
+  return new THREE.ExtrudeGeometry(shape, extSettings);
+}
+
+const hullMat = new THREE.MeshPhongMaterial({ color: 0x7a5010, specular: 0x331100, shininess: 30 });
+const hullGeo = makeHull();
+const hull = new THREE.Mesh(hullGeo, hullMat);
+hull.rotation.x = Math.PI / 2;
+hull.position.y = 0.05;
+hull.castShadow = true;
+boatGroup.add(hull);
+
+// Deck planks
+const deckMat = new THREE.MeshPhongMaterial({ color: 0xc8902a });
+const deckGeo = new THREE.BoxGeometry(2.6, 0.08, 0.9);
+const deck = new THREE.Mesh(deckGeo, deckMat);
+deck.position.y = 0.58;
+deck.castShadow = true;
+boatGroup.add(deck);
+
+// Cabin
+const cabinMat = new THREE.MeshPhongMaterial({ color: 0xd4a030 });
+const cabinGeo = new THREE.BoxGeometry(0.7, 0.55, 0.7);
+const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+cabin.position.set(0.1, 0.92, 0);
+cabin.castShadow = true;
+boatGroup.add(cabin);
+
+// Cabin roof
+const roofMat = new THREE.MeshPhongMaterial({ color: 0x8B3010 });
+const roofGeo = new THREE.CylinderGeometry(0, 0.56, 0.3, 4);
+const roof = new THREE.Mesh(roofGeo, roofMat);
+roof.position.set(0.1, 1.34, 0);
+roof.rotation.y = Math.PI / 4;
+boatGroup.add(roof);
+
+// Mast
+const mastMat = new THREE.MeshPhongMaterial({ color: 0x4a2a05 });
+const mastGeo = new THREE.CylinderGeometry(0.04, 0.06, 1.8, 6);
+const mast = new THREE.Mesh(mastGeo, mastMat);
+mast.position.set(0, 1.5, 0);
+boatGroup.add(mast);
+
+// Sail
+const sailMat = new THREE.MeshPhongMaterial({ color: 0xf0e8c0, side: THREE.DoubleSide });
+const sailGeo = new THREE.BufferGeometry();
+const sv = new Float32Array([0,0,0, 0.9,0,0, 0,1.2,0]);
+sailGeo.setAttribute('position', new THREE.BufferAttribute(sv, 3));
+sailGeo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0,0,1,0,0,1,0,0,1]), 3));
+sailGeo.setIndex([0,1,2]);
+const sail = new THREE.Mesh(sailGeo, sailMat);
+sail.position.set(-0.02, 0.65, 0.02);
+mast.add(sail);
+
+// Paddle wheel factory
+function makePaddleWheel(side) {
+  const group = new THREE.Group();
+  const axleMat = new THREE.MeshPhongMaterial({ color: 0x5a3a0a });
+  const axleGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.25, 8);
+  const axle = new THREE.Mesh(axleGeo, axleMat);
+  axle.rotation.z = Math.PI / 2;
+  group.add(axle);
+
+  const rimMat = new THREE.MeshPhongMaterial({ color: 0xb07020 });
+  const rimGeo = new THREE.TorusGeometry(0.38, 0.04, 6, 16);
+  const rim = new THREE.Mesh(rimGeo, rimMat);
+  group.add(rim);
+
+  const spokeMat = new THREE.MeshPhongMaterial({ color: 0xd09030 });
+  const paddleMat = new THREE.MeshPhongMaterial({ color: 0x8b5010 });
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const spokeGeo = new THREE.BoxGeometry(0.06, 0.38, 0.04);
+    const spoke = new THREE.Mesh(spokeGeo, spokeMat);
+    spoke.rotation.z = a;
+    group.add(spoke);
+
+    const padGeo = new THREE.BoxGeometry(0.04, 0.18, 0.22);
+    const pad = new THREE.Mesh(padGeo, paddleMat);
+    pad.position.set(Math.sin(a) * 0.34, Math.cos(a) * 0.34, 0);
+    pad.rotation.z = a;
+    group.add(pad);
+  }
+
+  const frameGeo = new THREE.BoxGeometry(0.7, 0.5, 0.1);
+  const frameMat = new THREE.MeshPhongMaterial({ color: 0x5a3a0a });
+  const frame = new THREE.Mesh(frameGeo, frameMat);
+  frame.position.set(0, 0, 0.14);
+  group.add(frame);
+
+  group.position.set(0, 0.2, side * 0.68);
+  return group;
+}
+
+const wheelL = makePaddleWheel(-1);
+const wheelR = makePaddleWheel(1);
+boatGroup.add(wheelL);
+boatGroup.add(wheelR);
+
+// Wake particles
+const wakeParticles = [];
+function spawnWake(x, z) {
+  if (wakeParticles.length > 60) {
+    const old = wakeParticles.shift();
+    scene.remove(old.mesh);
+  }
+  const geo = new THREE.SphereGeometry(0.08 + Math.random()*0.1, 4, 4);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x + (Math.random()-0.5)*0.5, 0.05, z + (Math.random()-0.5)*0.5);
+  scene.add(m);
+  wakeParticles.push({ mesh: m, life: 1.0 });
+}
+
+// ── ISLANDS ──
+const islandData = [
+  { x: 25, z: -18, r: 3.5 },
+  { x: -30, z: 20, r: 4.2 },
+  { x: 50, z: 30, r: 2.8 },
+  { x: -20, z: -45, r: 5.0 },
+  { x: 60, z: -50, r: 3.0 },
+  { x: -55, z: -30, r: 3.8 },
+  { x: 80, z: 10, r: 4.0 },
+  { x: -70, z: 60, r: 3.2 },
+  { x: 10, z: 70, r: 4.5 },
+  { x: -10, z: -80, r: 3.0 },
+  { x: 40, z: 80, r: 2.5 },
+  { x: -80, z: -10, r: 3.5 },
+];
+
+islandData.forEach(d => {
+  const g = new THREE.Group();
+
+  // Beach base
+  const beachGeo = new THREE.CylinderGeometry(d.r, d.r * 1.2, 0.5, 12);
+  const beachMat = new THREE.MeshPhongMaterial({ color: 0xf0d87a });
+  const beach = new THREE.Mesh(beachGeo, beachMat);
+  beach.receiveShadow = true;
+  beach.castShadow = true;
+  g.add(beach);
+
+  // Grass top
+  const grassGeo = new THREE.CylinderGeometry(d.r * 0.7, d.r * 0.9, 0.4, 12);
+  const grassMat = new THREE.MeshPhongMaterial({ color: 0x3a9a30 });
+  const grass = new THREE.Mesh(grassGeo, grassMat);
+  grass.position.y = 0.4;
+  grass.castShadow = true;
+  g.add(grass);
+
+  // Hill bump
+  const hillGeo = new THREE.SphereGeometry(d.r * 0.65, 10, 6);
+  const hillMat = new THREE.MeshPhongMaterial({ color: 0x4aaa38 });
+  const hill = new THREE.Mesh(hillGeo, hillMat);
+  hill.position.y = 0.55;
+  hill.scale.y = 0.45;
+  hill.castShadow = true;
+  g.add(hill);
+
+  // Palm tree (simple)
+  const trunkGeo = new THREE.CylinderGeometry(0.07, 0.12, 2.2, 6);
+  const trunkMat = new THREE.MeshPhongMaterial({ color: 0x8B6010 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 1.55;
+  trunk.rotation.z = (Math.random() - 0.5) * 0.3;
+  trunk.castShadow = true;
+  g.add(trunk);
+
+  const leafMat = new THREE.MeshPhongMaterial({ color: 0x2d8020, side: THREE.DoubleSide });
+  for (let i = 0; i < 6; i++) {
+    const la = (i / 6) * Math.PI * 2;
+    const leafGeo = new THREE.ConeGeometry(0.5, 1.0, 4);
+    const leaf = new THREE.Mesh(leafGeo, leafMat);
+    leaf.position.set(Math.cos(la)*0.55, 2.7, Math.sin(la)*0.55);
+    leaf.rotation.z = Math.cos(la) * 0.8;
+    leaf.rotation.x = Math.sin(la) * 0.8;
+    leaf.castShadow = true;
+    g.add(leaf);
+  }
+
+  g.position.set(d.x, 0, d.z);
+  scene.add(g);
+});
+
+// ── GAME STATE ──
+const gs = {
+  x: 0, z: 0, angle: 0,
+  speed: 0, maxSpeed: 5,
+  wheelRot: 0,
+  nextExpected: 'left',
+  combo: 0,
+  tilt: 0,
+  started: false,
+  collisionCooldown: 0,
+};
+
+// Camera state
+const camOffset = new THREE.Vector3(0, 4.5, 9);
+const camTarget = new THREE.Vector3();
+const camPos = new THREE.Vector3();
+
+// Gyro
+let gyroReady = false;
+function requestGyro() {
+  if (gyroReady) return;
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(r => {
+      if (r === 'granted') startGyro();
+    }).catch(() => {});
+  } else {
+    startGyro();
+  }
+}
+function startGyro() {
+  window.addEventListener('deviceorientation', e => {
+    if (e.gamma !== null) {
+      gyroReady = true;
+      gs.tilt = Math.max(-1, Math.min(1, e.gamma / 30));
+    }
+  });
+}
+
+// Tap handlers
+function handleTap(side) {
+  requestGyro();
+  if (!gs.started) {
+    gs.started = true;
+    document.getElementById('hint').style.display = 'none';
+  }
+  if (side === gs.nextExpected) {
+    gs.combo++;
+    gs.speed = Math.min(gs.maxSpeed, gs.speed + 0.4 + gs.combo * 0.05);
+    gs.nextExpected = side === 'left' ? 'right' : 'left';
+  } else {
+    gs.combo = 0;
+    gs.speed = Math.max(0, gs.speed - 0.4);
+  }
+}
+
+document.getElementById('tap-left').addEventListener('touchstart', e => { e.preventDefault(); handleTap('left'); }, { passive: false });
+document.getElementById('tap-right').addEventListener('touchstart', e => { e.preventDefault(); handleTap('right'); }, { passive: false });
+document.getElementById('tap-left').addEventListener('mousedown', () => handleTap('left'));
+document.getElementById('tap-right').addEventListener('mousedown', () => handleTap('right'));
+
+// Collision detection
+function checkCollisions() {
+  if (gs.collisionCooldown > 0) return;
+  for (const d of islandData) {
+    const dx = gs.x - d.x;
+    const dz = gs.z - d.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist < d.r * 1.15 + 1.2) {
+      gs.speed = -1.2;
+      gs.x += (dx / dist) * 1.5;
+      gs.z += (dz / dist) * 1.5;
+      gs.collisionCooldown = 40;
+      gs.combo = 0;
+      const flash = document.getElementById('collision-flash');
+      flash.style.background = 'rgba(255,60,60,0.4)';
+      setTimeout(() => { flash.style.background = 'rgba(255,60,60,0)'; }, 180);
+      return;
+    }
+  }
+}
+
+let lastTime = 0;
+let wakeTimer = 0;
+
+function animate(t) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((t - lastTime) / 16.67, 3);
+  lastTime = t;
+
+  // Water waves
+  const time = t * 0.001;
+  for (let i = 0; i < wPos.count; i++) {
+    const x = wPos.getX(i);
+    const z = wPos.getZ(i);
+    wPos.setZ(i, Math.sin(x * 0.3 + time) * 0.18 + Math.cos(z * 0.25 + time * 1.1) * 0.12);
+  }
+  wPos.needsUpdate = true;
+  waterGeo.computeVertexNormals();
+
+  if (gs.collisionCooldown > 0) gs.collisionCooldown -= dt;
+
+  gs.speed *= Math.pow(0.982, dt);
+  if (Math.abs(gs.speed) < 0.005) { gs.speed = 0; gs.combo = 0; }
+
+  if (gs.speed > 0.05 || gs.speed < -0.05) {
+    gs.angle += gs.tilt * 0.028 * dt * (gs.speed / gs.maxSpeed);
+  }
+
+  gs.x += Math.sin(gs.angle) * gs.speed * dt * 0.18;
+  gs.z += Math.cos(gs.angle) * gs.speed * dt * 0.18;
+
+  gs.wheelRot += gs.speed * 0.07 * dt;
+  wheelL.rotation.x = gs.wheelRot;
+  wheelR.rotation.x = gs.wheelRot;
+
+  checkCollisions();
+
+  boatGroup.position.set(gs.x, 0, gs.z);
+  boatGroup.rotation.y = gs.angle;
+
+  // Gentle boat rock
+  boatGroup.rotation.z = Math.sin(time * 1.2) * 0.03;
+  boatGroup.rotation.x = Math.cos(time * 0.9) * 0.02;
+  boatGroup.position.y = Math.sin(time * 1.5) * 0.06;
+
+  // Wake
+  if (gs.speed > 0.5) {
+    wakeTimer += dt;
+    if (wakeTimer > 3) {
+      wakeTimer = 0;
+      spawnWake(gs.x, gs.z);
+    }
+  }
+  for (let i = wakeParticles.length - 1; i >= 0; i--) {
+    const p = wakeParticles[i];
+    p.life -= 0.012 * dt;
+    p.mesh.material.opacity = p.life * 0.5;
+    p.mesh.scale.setScalar(1 + (1 - p.life) * 1.5);
+    if (p.life <= 0) {
+      scene.remove(p.mesh);
+      wakeParticles.splice(i, 1);
+    }
+  }
+
+  // Third-person camera
+  const behindX = gs.x - Math.sin(gs.angle) * camOffset.z;
+  const behindZ = gs.z - Math.cos(gs.angle) * camOffset.z;
+  const targetCam = new THREE.Vector3(behindX, camOffset.y, behindZ);
+  camPos.lerp(targetCam, 0.07);
+  camera.position.copy(camPos);
+
+  camTarget.lerp(new THREE.Vector3(gs.x, 0.8, gs.z), 0.1);
+  camera.lookAt(camTarget);
+
+  // Compass
+  const needle = document.getElementById('compass-needle');
+  const tail = document.getElementById('compass-tail');
+  const nx = 26 + Math.sin(gs.angle) * 18;
+  const ny = 26 - Math.cos(gs.angle) * 18;
+  const tx = 26 - Math.sin(gs.angle) * 12;
+  const ty = 26 + Math.cos(gs.angle) * 12;
+  needle.setAttribute('x2', nx); needle.setAttribute('y2', ny);
+  tail.setAttribute('x2', tx); tail.setAttribute('y2', ty);
+
+  // Speed bar
+  const fillEl = document.getElementById('speed-bar-fill');
+  if (fillEl) fillEl.style.width = Math.round(Math.max(0, gs.speed / gs.maxSpeed) * 100) + '%';
+
+  // Next tap indicator
+  const bL = document.getElementById('badge-left');
+  const bR = document.getElementById('badge-right');
+  if (bL) bL.style.opacity = gs.nextExpected === 'left' ? '1' : '0.35';
+  if (bR) bR.style.opacity = gs.nextExpected === 'right' ? '1' : '0.35';
+
+  renderer.render(scene, camera);
+}
+
+// Init camera
+camPos.set(0, 5, 9);
+camera.position.copy(camPos);
+camera.lookAt(0, 0, 0);
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
