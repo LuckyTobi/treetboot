@@ -42,6 +42,28 @@
     z-index: 20; pointer-events: none;
     border: 1px solid rgba(255,255,255,0.15);
   }
+  #intro-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: #08121c;
+    display: flex; align-items: center; justify-content: center;
+    padding: 32px;
+  }
+  #intro-box {
+    max-width: 440px; text-align: center; color: rgba(255,255,255,0.95);
+  }
+  #intro-box p {
+    font-size: 17px; line-height: 1.65; margin-bottom: 18px;
+  }
+  #intro-tap-hint {
+    display: inline-block; margin-top: 10px;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.3px;
+    color: rgba(255,255,255,0.7);
+    animation: introPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes introPulse {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+  }
   #tap-left, #tap-right {
     position: fixed; top: 0; bottom: 70px; width: 50%; z-index: 5;
   }
@@ -83,6 +105,14 @@
   <circle cx="26" cy="26" r="3" fill="#fff"/>
 </svg>
 <div id="hint">Wechselnd links/rechts tippen zum Starten<br>📱 Handy neigen zum Lenken</div>
+
+<div id="intro-overlay">
+  <div id="intro-box">
+    <p>Anna und Karl entdecken Leonardos Tretboot. Mit Pedalen und Schaufelrädern sollte es sich durch Muskelkraft über das Wasser bewegen.</p>
+    <p>Probiert selbst aus, wie es funktioniert!</p>
+    <span id="intro-tap-hint">Zum Start tippen</span>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -435,6 +465,16 @@ document.getElementById('tap-left').addEventListener('touchstart', e => { e.prev
 document.getElementById('tap-right').addEventListener('touchstart', e => { e.preventDefault(); handleTap('right'); }, { passive: false });
 document.getElementById('tap-left').addEventListener('mousedown', () => handleTap('left'));
 document.getElementById('tap-right').addEventListener('mousedown', () => handleTap('right'));
+
+// Intro story screen - a single tap anywhere dismisses it, the game
+// (already rendering behind it) only becomes visible afterwards. This
+// tap does not count as paddling input.
+const introOverlay = document.getElementById('intro-overlay');
+function dismissIntro() {
+  introOverlay.style.display = 'none';
+}
+introOverlay.addEventListener('touchstart', e => { e.preventDefault(); dismissIntro(); }, { passive: false });
+introOverlay.addEventListener('mousedown', dismissIntro);
 
 // Collision detection
 function checkCollisions() {
