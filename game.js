@@ -205,8 +205,11 @@ function animate(t) {
   gs.speed *= Math.pow(0.982, dt);
   if (Math.abs(gs.speed) < 0.005) { gs.speed = 0; gs.combo = 0; }
 
-  if (gs.speed > 0.05 || gs.speed < -0.05) {
-    gs.angle += gs.tilt * 0.028 * dt * (gs.speed / gs.maxSpeed);
+  // Direktere Lenkung: kleinerer Wendekreis und auch bei langsamer Fahrt noch gut steuerbar.
+  if (Math.abs(gs.speed) > 0.05) {
+    const speedFactor = Math.max(0.35, Math.min(1, Math.abs(gs.speed) / gs.maxSpeed));
+    const direction = gs.speed >= 0 ? 1 : -1;
+    gs.angle += gs.tilt * 0.042 * dt * speedFactor * direction;
   }
   gs.x += Math.sin(gs.angle) * gs.speed * dt * 0.18;
   gs.z += Math.cos(gs.angle) * gs.speed * dt * 0.18;
