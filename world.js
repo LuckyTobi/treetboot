@@ -15,27 +15,77 @@ function makeFishTexture() {
   return texture;
 }
 const fishTexture = makeFishTexture();
+
+// Etwas weiter in der Welt verteilt, aber weiterhin in kurzer Spielzeit erreichbar.
 const fishTargetData = [
-  { x: 0, z: 10 },
-  { x: 8, z: 23 },
-  { x: -7, z: 36 }
+  { x: 0, z: 11 },
+  { x: 11, z: 28 },
+  { x: -10, z: 46 }
 ];
+
 const fishTargets = fishTargetData.map((d, index) => {
   const group = new THREE.Group();
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd34d, side: THREE.DoubleSide, transparent: true, opacity: 0.78 });
+
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xffd34d,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.78
+  });
   const ring = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.62, 48), ringMat);
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.09;
   group.add(ring);
 
-  const innerMat = new THREE.MeshBasicMaterial({ color: 0x7be4ff, side: THREE.DoubleSide, transparent: true, opacity: 0.22 });
+  const innerMat = new THREE.MeshBasicMaterial({
+    color: 0x7be4ff,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.22
+  });
   const innerCircle = new THREE.Mesh(new THREE.CircleGeometry(1.22, 48), innerMat);
   innerCircle.rotation.x = -Math.PI / 2;
   innerCircle.position.y = 0.085;
   group.add(innerCircle);
 
+  // Leicht transparenter roter Lichtstrahl als weithin sichtbarer Beacon.
+  // Zwei überlagerte, additive Kegel/Zylinder sorgen für eine weichere Lichtwirkung.
+  const beamCoreMat = new THREE.MeshBasicMaterial({
+    color: 0xff4b42,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending
+  });
+  const beamCore = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.34, 0.50, 16, 28, 1, true),
+    beamCoreMat
+  );
+  beamCore.position.y = 8.05;
+  group.add(beamCore);
+
+  const beamGlowMat = new THREE.MeshBasicMaterial({
+    color: 0xff6a62,
+    transparent: true,
+    opacity: 0.055,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending
+  });
+  const beamGlow = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.70, 0.88, 16.5, 28, 1, true),
+    beamGlowMat
+  );
+  beamGlow.position.y = 8.25;
+  group.add(beamGlow);
+
   // Quadratische Sprite-Fläche: dadurch wird der Fisch auf Handys nicht gestreckt.
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: fishTexture, transparent: true, depthTest: false }));
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: fishTexture,
+    transparent: true,
+    depthTest: false
+  }));
   sprite.scale.set(1.30, 1.30, 1);
   sprite.position.y = 1.25;
   group.add(sprite);
@@ -43,7 +93,7 @@ const fishTargets = fishTargetData.map((d, index) => {
   group.position.set(d.x, 0, d.z);
   group.userData.index = index;
   scene.add(group);
-  return { group, ring, sprite, collected: false };
+  return { group, ring, sprite, beamCore, beamGlow, collected: false };
 });
 
 // Wake particles
