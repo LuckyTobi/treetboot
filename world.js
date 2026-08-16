@@ -1,14 +1,17 @@
 // ── FISCH-FELDER ──
 function makeFishTexture() {
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 160;
+  c.width = 256; c.height = 256;
   const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, 256, 256);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '104px Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif';
-  ctx.fillText('🐟', 128, 82);
+  ctx.font = '118px Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif';
+  ctx.fillText('🐟', 128, 132);
   const texture = new THREE.CanvasTexture(c);
   texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
   return texture;
 }
 const fishTexture = makeFishTexture();
@@ -31,8 +34,9 @@ const fishTargets = fishTargetData.map((d, index) => {
   innerCircle.position.y = 0.085;
   group.add(innerCircle);
 
+  // Quadratische Sprite-Fläche: dadurch wird der Fisch auf Handys nicht gestreckt.
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: fishTexture, transparent: true, depthTest: false }));
-  sprite.scale.set(1.55, 0.97, 1);
+  sprite.scale.set(1.30, 1.30, 1);
   sprite.position.y = 1.25;
   group.add(sprite);
 
@@ -59,12 +63,19 @@ function spawnWake(x, z) {
 
 // ── ISLANDS ──
 const islandData = [
+  // Zusätzliche Inseln näher an der eigentlichen Spielstrecke
+  { x: -13, z: 13, r: 2.2 }, { x: 16, z: 18, r: 2.5 },
+  { x: -17, z: 28, r: 2.4 }, { x: 16, z: 37, r: 2.1 },
+  { x: 2, z: 52, r: 2.8 }, { x: -15, z: 57, r: 2.0 },
+
+  // Größere Inselwelt im Hintergrund
   { x: 25, z: -18, r: 3.5 }, { x: -30, z: 20, r: 4.2 },
   { x: 50, z: 30, r: 2.8 }, { x: -20, z: -45, r: 5.0 },
   { x: 60, z: -50, r: 3.0 }, { x: -55, z: -30, r: 3.8 },
   { x: 80, z: 10, r: 4.0 }, { x: -70, z: 60, r: 3.2 },
   { x: 10, z: 70, r: 4.5 }, { x: -10, z: -80, r: 3.0 },
   { x: 40, z: 80, r: 2.5 }, { x: -80, z: -10, r: 3.5 },
+  { x: 28, z: 58, r: 3.0 }, { x: -34, z: 48, r: 3.4 },
 ];
 
 islandData.forEach(d => {
