@@ -25,28 +25,39 @@ function getNextFishTarget() {
   return fishTargets.find(t => !t.collected) || null;
 }
 
-function updateFishGuide() {
-  const guide = document.getElementById('fish-guide');
-  const arrow = document.getElementById('fish-guide-arrow');
-  const distanceEl = document.getElementById('fish-guide-distance');
+// Der runde Anzeige-Kreis oben rechts ist KEIN Nord-Kompass mehr.
+// Die Nadel zeigt immer relativ zur aktuellen Fahrtrichtung auf den
+// nächsten noch nicht eingesammelten Fisch.
+function updateFishCompass() {
+  const compass = document.getElementById('compass');
+  const needle = document.getElementById('compass-needle');
   const target = getNextFishTarget();
+  if (!compass || !needle) return;
 
-  if (!guide || !arrow || !distanceEl || !gs.missionActive || gs.missionDone || !target) {
-    if (guide) guide.style.display = 'none';
+  if (!gs.missionActive || gs.missionDone || !target) {
+    compass.style.opacity = '0.4';
+    needle.setAttribute('x2', 26);
+    needle.setAttribute('y2', 7);
     return;
   }
 
-  guide.style.display = 'flex';
+  compass.style.opacity = '1';
   const dx = target.group.position.x - gs.x;
   const dz = target.group.position.z - gs.z;
-  const distance = Math.sqrt(dx*dx + dz*dz);
+
+  // Weltwinkel zum Fisch: 0 = geradeaus in +Z.
   const targetAngle = Math.atan2(dx, dz);
   let relative = targetAngle - gs.angle;
   while (relative > Math.PI) relative -= Math.PI * 2;
   while (relative < -Math.PI) relative += Math.PI * 2;
 
-  arrow.style.transform = `rotate(${relative}rad)`;
-  distanceEl.textContent = `${Math.max(1, Math.round(distance))} m`;
+  // Oben im Kreis bedeutet: Fisch liegt direkt vor dem Boot.
+  // Rechts bedeutet: rechts vom Boot; unten: hinter dem Boot.
+  const radius = 19;
+  const nx = 26 + Math.sin(relative) * radius;
+  const ny = 26 - Math.cos(relative) * radius;
+  needle.setAttribute('x2', nx.toFixed(2));
+  needle.setAttribute('y2', ny.toFixed(2));
 }
 
 function showControlHint() {
@@ -62,7 +73,7 @@ function resetMission() {
   gs.missionActive = true; gs.missionDone = false; gs.fishCollected = 0;
   fishTargets.forEach(t => { t.collected = false; t.group.visible = true; });
   updateFishCounter();
-  updateFishGuide();
+  updateFishCompass();
   boatGroup.position.set(0, 0, 0);
   boatGroup.rotation.set(0, 0, 0);
   camPos.set(0, 5, 9);
@@ -74,7 +85,7 @@ function finishMission() {
   gs.missionDone = true;
   gs.missionActive = false;
   gs.speed = 0;
-  updateFishGuide();
+  updateFishCompass();
   setTimeout(() => { document.getElementById('success-overlay').style.display = 'flex'; }, 250);
 }
 
@@ -89,7 +100,7 @@ function checkFishTargets() {
       t.group.visible = false;
       gs.fishCollected++;
       updateFishCounter();
-      updateFishGuide();
+      updateFishCompass();
       if (gs.fishCollected >= 3) finishMission();
     }
   });
@@ -208,13 +219,15 @@ function animate(t) {
 
   checkCollisions();
   checkFishTargets();
-  updateFishGuide();
 
   boatGroup.position.set(gs.x, 0, gs.z);
   boatGroup.rotation.y = gs.angle;
   boatGroup.rotation.z = Math.sin(time * 1.2) * 0.03;
   boatGroup.rotation.x = Math.cos(time * 0.9) * 0.02;
   boatGroup.position.y = Math.sin(time * 1.5) * 0.06;
+
+  // Nach der Positions- und Richtungsänderung das Fisch-Navi aktualisieren.
+  updateFishCompass();
 
   if (gs.speed > 0.5) {
     wakeTimer += dt;
@@ -242,15 +255,6 @@ function animate(t) {
   camTarget.lerp(new THREE.Vector3(gs.x, 0.8, gs.z), 0.1);
   camera.lookAt(camTarget);
 
-  const needle = document.getElementById('compass-needle');
-  const tail = document.getElementById('compass-tail');
-  const nx = 26 + Math.sin(gs.angle) * 18;
-  const ny = 26 - Math.cos(gs.angle) * 18;
-  const tx = 26 - Math.sin(gs.angle) * 12;
-  const ty = 26 + Math.cos(gs.angle) * 12;
-  needle.setAttribute('x2', nx); needle.setAttribute('y2', ny);
-  tail.setAttribute('x2', tx); tail.setAttribute('y2', ty);
-
   const fillEl = document.getElementById('speed-bar-fill');
   if (fillEl) fillEl.style.width = Math.round(Math.max(0, gs.speed / gs.maxSpeed) * 100) + '%';
 
@@ -266,5 +270,5 @@ camPos.set(0, 5, 9);
 camera.position.copy(camPos);
 camera.lookAt(0, 0, 0);
 updateFishCounter();
-updateFishGuide();
+updateFishCompass();
 requestAnimationFrame(animate);
