@@ -1,13 +1,84 @@
 // ── FISCH-FELDER ──
+// Eigene Canvas-Zeichnung statt Emoji: sieht auf Android/iPhone/PC gleich aus.
 function makeFishTexture() {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, 256, 256);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = '118px Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif';
-  ctx.fillText('🐟', 128, 132);
+
+  ctx.save();
+  ctx.translate(128, 128);
+
+  // Schwanz
+  ctx.beginPath();
+  ctx.moveTo(-64, 0);
+  ctx.lineTo(-105, -40);
+  ctx.lineTo(-101, 38);
+  ctx.closePath();
+  ctx.fillStyle = '#2679b8';
+  ctx.fill();
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = '#15517f';
+  ctx.stroke();
+
+  // Körper
+  ctx.beginPath();
+  ctx.ellipse(10, 0, 82, 52, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#56b9e9';
+  ctx.fill();
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = '#15517f';
+  ctx.stroke();
+
+  // Bauch
+  ctx.beginPath();
+  ctx.ellipse(18, 15, 58, 26, 0, 0, Math.PI);
+  ctx.fillStyle = '#9be4f4';
+  ctx.fill();
+
+  // obere Flosse
+  ctx.beginPath();
+  ctx.moveTo(-12, -48);
+  ctx.lineTo(14, -78);
+  ctx.lineTo(35, -44);
+  ctx.closePath();
+  ctx.fillStyle = '#2679b8';
+  ctx.fill();
+
+  // Seitenflosse
+  ctx.beginPath();
+  ctx.moveTo(5, 13);
+  ctx.lineTo(-22, 48);
+  ctx.lineTo(28, 30);
+  ctx.closePath();
+  ctx.fillStyle = '#2679b8';
+  ctx.fill();
+
+  // Auge
+  ctx.beginPath();
+  ctx.arc(54, -13, 10, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(57, -13, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#17242d';
+  ctx.fill();
+
+  // Mund
+  ctx.beginPath();
+  ctx.arc(76, 8, 10, -0.7, 0.7);
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = '#15517f';
+  ctx.stroke();
+
+  // kleine Schuppenpunkte
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  [[-15,-14],[8,-20],[30,1],[-10,12]].forEach(([x,y]) => {
+    ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+  });
+
+  ctx.restore();
+
   const texture = new THREE.CanvasTexture(c);
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
@@ -80,13 +151,12 @@ const fishTargets = fishTargetData.map((d, index) => {
   beamGlow.position.y = 8.25;
   group.add(beamGlow);
 
-  // Quadratische Sprite-Fläche: dadurch wird der Fisch auf Handys nicht gestreckt.
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: fishTexture,
     transparent: true,
     depthTest: false
   }));
-  sprite.scale.set(1.30, 1.30, 1);
+  sprite.scale.set(1.45, 1.45, 1);
   sprite.position.y = 1.25;
   group.add(sprite);
 
