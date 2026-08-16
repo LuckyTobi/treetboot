@@ -21,6 +21,34 @@ function updateFishCounter() {
   document.getElementById('fish-counter').textContent = `🐟 ${gs.fishCollected} / 3`;
 }
 
+function getNextFishTarget() {
+  return fishTargets.find(t => !t.collected) || null;
+}
+
+function updateFishGuide() {
+  const guide = document.getElementById('fish-guide');
+  const arrow = document.getElementById('fish-guide-arrow');
+  const distanceEl = document.getElementById('fish-guide-distance');
+  const target = getNextFishTarget();
+
+  if (!guide || !arrow || !distanceEl || !gs.missionActive || gs.missionDone || !target) {
+    if (guide) guide.style.display = 'none';
+    return;
+  }
+
+  guide.style.display = 'flex';
+  const dx = target.group.position.x - gs.x;
+  const dz = target.group.position.z - gs.z;
+  const distance = Math.sqrt(dx*dx + dz*dz);
+  const targetAngle = Math.atan2(dx, dz);
+  let relative = targetAngle - gs.angle;
+  while (relative > Math.PI) relative -= Math.PI * 2;
+  while (relative < -Math.PI) relative += Math.PI * 2;
+
+  arrow.style.transform = `rotate(${relative}rad)`;
+  distanceEl.textContent = `${Math.max(1, Math.round(distance))} m`;
+}
+
 function showControlHint() {
   const hint = document.getElementById('hint');
   hint.style.display = 'block';
@@ -34,6 +62,7 @@ function resetMission() {
   gs.missionActive = true; gs.missionDone = false; gs.fishCollected = 0;
   fishTargets.forEach(t => { t.collected = false; t.group.visible = true; });
   updateFishCounter();
+  updateFishGuide();
   boatGroup.position.set(0, 0, 0);
   boatGroup.rotation.set(0, 0, 0);
   camPos.set(0, 5, 9);
@@ -45,6 +74,7 @@ function finishMission() {
   gs.missionDone = true;
   gs.missionActive = false;
   gs.speed = 0;
+  updateFishGuide();
   setTimeout(() => { document.getElementById('success-overlay').style.display = 'flex'; }, 250);
 }
 
@@ -59,6 +89,7 @@ function checkFishTargets() {
       t.group.visible = false;
       gs.fishCollected++;
       updateFishCounter();
+      updateFishGuide();
       if (gs.fishCollected >= 3) finishMission();
     }
   });
@@ -177,6 +208,7 @@ function animate(t) {
 
   checkCollisions();
   checkFishTargets();
+  updateFishGuide();
 
   boatGroup.position.set(gs.x, 0, gs.z);
   boatGroup.rotation.y = gs.angle;
@@ -234,4 +266,5 @@ camPos.set(0, 5, 9);
 camera.position.copy(camPos);
 camera.lookAt(0, 0, 0);
 updateFishCounter();
+updateFishGuide();
 requestAnimationFrame(animate);
