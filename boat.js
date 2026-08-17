@@ -118,25 +118,6 @@ axle.position.set(0, 0.98, 0.02);
 axle.castShadow = true;
 boatGroup.add(axle);
 
-function makeSideFrame(side) {
-  const g = new THREE.Group();
-  const sx = side * 0.84;
-  addBeam(g, [sx,0.45,-0.62], [sx,0.98,0.02], 0.085, woodMid);
-  addBeam(g, [sx,0.98,0.02], [sx,1.88,-0.78], 0.085, woodMid);
-  addBeam(g, [sx,0.45, 0.62], [sx,0.98,0.02], 0.085, woodMid);
-  addBeam(g, [sx,0.98,0.02], [sx,1.88, 0.78], 0.085, woodMid);
-  addBeam(g, [sx,1.88,-0.78], [sx,1.88,0.78], 0.07, woodMid);
-  addBeam(g, [sx,0.45,-0.62], [sx,0.45,0.62], 0.07, woodMid);
-  const bearing = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.12,12), mechanismMat);
-  bearing.rotation.z = Math.PI / 2;
-  bearing.position.set(sx,0.98,0.02);
-  bearing.castShadow = true;
-  g.add(bearing);
-  return g;
-}
-boatGroup.add(makeSideFrame(-1));
-boatGroup.add(makeSideFrame(1));
-
 function makeGear(radius, teeth, x, y, z, material) {
   const g = new THREE.Group();
   const disk = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.13, 20), material);
