@@ -179,13 +179,6 @@ function makePaddleWheel(side) {
     g.add(rim);
   });
 
-  for(let i=0;i<2;i++) {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.85, 0.11), woodMid);
-    arm.rotation.x = i * Math.PI/2;
-    arm.castShadow = true;
-    g.add(arm);
-  }
-
   // Breite, gut erkennbare Schaufeln an den Außenseiten des Boots.
   for(let i=0;i<6;i++) {
     const a = i/6*Math.PI*2;
