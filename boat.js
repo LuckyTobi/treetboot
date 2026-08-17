@@ -44,8 +44,7 @@ const wPos = waterGeo.attributes.position;
 const wOrigY = [];
 for (let i = 0; i < wPos.count; i++) wOrigY.push(wPos.getY(i));
 
-// ── BOAT: farbiges Holzmodell nach der Museums-/3D-Vorlage ──
-// Wichtig: Die Vorrichtung/der Sockel unter dem Boot aus der Vorlage wird NICHT übernommen.
+// ── BOAT: klassischer, schlanker Ruderboot-Rumpf mit sichtbarer Mechanik ──
 const boatGroup = new THREE.Group();
 scene.add(boatGroup);
 
@@ -69,50 +68,51 @@ function addBeam(parent, from, to, thickness, material) {
   return mesh;
 }
 
+// Top-down outline: länglich, bauchig in der Mitte und an Bug/Heck klar spitz zulaufend.
 function makeHullShape(scale = 1) {
   const s = new THREE.Shape();
-  s.moveTo(-0.34 * scale, -2.00 * scale);
-  s.lineTo(-0.62 * scale, -1.45 * scale);
-  s.lineTo(-0.70 * scale, 0.75 * scale);
-  s.lineTo(-0.54 * scale, 1.48 * scale);
-  s.lineTo(0, 2.30 * scale);
-  s.lineTo(0.54 * scale, 1.48 * scale);
-  s.lineTo(0.70 * scale, 0.75 * scale);
-  s.lineTo(0.62 * scale, -1.45 * scale);
-  s.lineTo(0.34 * scale, -2.00 * scale);
+  s.moveTo(0, -2.22 * scale);
+  s.bezierCurveTo(-0.42 * scale, -2.02 * scale, -0.76 * scale, -1.35 * scale, -0.82 * scale, -0.35 * scale);
+  s.bezierCurveTo(-0.84 * scale, 0.58 * scale, -0.67 * scale, 1.48 * scale, 0, 2.36 * scale);
+  s.bezierCurveTo(0.67 * scale, 1.48 * scale, 0.84 * scale, 0.58 * scale, 0.82 * scale, -0.35 * scale);
+  s.bezierCurveTo(0.76 * scale, -1.35 * scale, 0.42 * scale, -2.02 * scale, 0, -2.22 * scale);
   s.closePath();
   return s;
 }
 
 const hullGeo = new THREE.ExtrudeGeometry(makeHullShape(1), {
-  depth: 0.58, bevelEnabled: true, bevelThickness: 0.07,
-  bevelSize: 0.07, bevelSegments: 3
+  depth: 0.62, bevelEnabled: true, bevelThickness: 0.09,
+  bevelSize: 0.08, bevelSegments: 4
 });
 const hull = new THREE.Mesh(hullGeo, woodHull);
 hull.rotation.x = Math.PI / 2;
-hull.position.y = 0.02;
+hull.position.y = -0.02;
 hull.castShadow = true;
 boatGroup.add(hull);
 
-const innerGeo = new THREE.ExtrudeGeometry(makeHullShape(0.84), { depth: 0.035, bevelEnabled: false });
+// Dunklere Innenfläche gibt dem Rumpf optisch mehr Tiefe statt einer massiven Nussschalenwirkung.
+const innerGeo = new THREE.ExtrudeGeometry(makeHullShape(0.82), { depth: 0.035, bevelEnabled: false });
 const inner = new THREE.Mesh(innerGeo, woodDark);
 inner.rotation.x = Math.PI / 2;
-inner.position.y = 0.44;
+inner.position.y = 0.47;
 boatGroup.add(inner);
 
-addBeam(boatGroup, [-0.62,0.49,-1.42], [-0.70,0.49,0.72], 0.07, woodLight);
-addBeam(boatGroup, [ 0.62,0.49,-1.42], [ 0.70,0.49,0.72], 0.07, woodLight);
-addBeam(boatGroup, [-0.70,0.49,0.72], [-0.50,0.49,1.55], 0.07, woodLight);
-addBeam(boatGroup, [ 0.70,0.49,0.72], [ 0.50,0.49,1.55], 0.07, woodLight);
+// Geschwungene obere Bordkanten passend zur neuen Ruderbootform.
+addBeam(boatGroup, [-0.63,0.52,-1.55], [-0.80,0.52,-0.38], 0.07, woodLight);
+addBeam(boatGroup, [-0.80,0.52,-0.38], [-0.68,0.52,1.30], 0.07, woodLight);
+addBeam(boatGroup, [-0.68,0.52,1.30], [0,0.52,2.22], 0.07, woodLight);
+addBeam(boatGroup, [ 0.63,0.52,-1.55], [ 0.80,0.52,-0.38], 0.07, woodLight);
+addBeam(boatGroup, [ 0.80,0.52,-0.38], [ 0.68,0.52,1.30], 0.07, woodLight);
+addBeam(boatGroup, [ 0.68,0.52,1.30], [0,0.52,2.22], 0.07, woodLight);
 
 [-1.05, 0.95].forEach(zPos => {
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.08, 0.18), woodLight);
-  seat.position.set(0, 0.55, zPos);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.08, 0.20), woodLight);
+  seat.position.set(0, 0.56, zPos);
   seat.castShadow = true;
   boatGroup.add(seat);
 });
 
-const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 2.65, 12), metalDark);
+const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 2.95, 12), metalDark);
 axle.rotation.z = Math.PI / 2;
 axle.position.set(0, 0.98, 0.02);
 axle.castShadow = true;
@@ -120,7 +120,7 @@ boatGroup.add(axle);
 
 function makeSideFrame(side) {
   const g = new THREE.Group();
-  const sx = side * 0.78;
+  const sx = side * 0.84;
   addBeam(g, [sx,0.45,-0.62], [sx,0.98,0.02], 0.085, woodMid);
   addBeam(g, [sx,0.98,0.02], [sx,1.88,-0.78], 0.085, woodMid);
   addBeam(g, [sx,0.45, 0.62], [sx,0.98,0.02], 0.085, woodMid);
@@ -184,30 +184,39 @@ boatGroup.add(makeSpokedGear(0.34,0.18));
 
 function makePaddleWheel(side) {
   const g = new THREE.Group();
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.16,12), mechanismMat);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.34,12), mechanismMat);
   hub.rotation.z = Math.PI/2;
   hub.castShadow = true;
   g.add(hub);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.64,0.045,7,24), woodLight);
-  rim.rotation.y = Math.PI/2;
-  rim.castShadow = true;
-  g.add(rim);
+
+  // Zwei Ringe machen das Rad sichtbar breiter und stabiler.
+  [-0.16, 0.16].forEach(xOff => {
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.64,0.045,7,24), woodLight);
+    rim.rotation.y = Math.PI/2;
+    rim.position.x = xOff;
+    rim.castShadow = true;
+    g.add(rim);
+  });
+
   for(let i=0;i<2;i++) {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.11, 1.85, 0.11), woodMid);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.85, 0.11), woodMid);
     arm.rotation.x = i * Math.PI/2;
     arm.castShadow = true;
     g.add(arm);
   }
-  for(let i=0;i<4;i++) {
-    const a = i/4*Math.PI*2;
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.38,0.54), woodLight);
-    blade.position.set(0, Math.cos(a)*1.03, Math.sin(a)*1.03);
+
+  // Breite, gut erkennbare Schaufeln an den Außenseiten des Boots.
+  for(let i=0;i<6;i++) {
+    const a = i/6*Math.PI*2;
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.34,0.58), woodLight);
+    blade.position.set(0, Math.cos(a)*1.00, Math.sin(a)*1.00);
     blade.rotation.x = a;
     blade.castShadow = true;
     g.add(blade);
-    addBeam(g, [0, Math.cos(a)*0.63, Math.sin(a)*0.63], [0, Math.cos(a)*0.91, Math.sin(a)*0.91], 0.07, woodMid);
+    addBeam(g, [0, Math.cos(a)*0.63, Math.sin(a)*0.63], [0, Math.cos(a)*0.89, Math.sin(a)*0.89], 0.075, woodMid);
   }
-  g.position.set(side * 0.96, 0.98, 0.02);
+
+  g.position.set(side * 1.08, 0.98, 0.02);
   return g;
 }
 const wheelL = makePaddleWheel(-1);
