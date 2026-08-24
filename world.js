@@ -1,83 +1,16 @@
 // ── FISCH-FELDER ──
-// Eigene Canvas-Zeichnung statt Emoji: sieht auf Android/iPhone/PC gleich aus.
+// Einfaches Fisch-Emoji als Sprite. Dadurch ist das Ziel sofort erkennbar
+// und wir brauchen keine separat gezeichnete Fischgrafik mehr.
 function makeFishTexture() {
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
+  c.width = 256;
+  c.height = 256;
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, 256, 256);
-
-  ctx.save();
-  ctx.translate(128, 128);
-
-  // Schwanz
-  ctx.beginPath();
-  ctx.moveTo(-64, 0);
-  ctx.lineTo(-105, -40);
-  ctx.lineTo(-101, 38);
-  ctx.closePath();
-  ctx.fillStyle = '#2679b8';
-  ctx.fill();
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = '#15517f';
-  ctx.stroke();
-
-  // Körper
-  ctx.beginPath();
-  ctx.ellipse(10, 0, 82, 52, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#56b9e9';
-  ctx.fill();
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = '#15517f';
-  ctx.stroke();
-
-  // Bauch
-  ctx.beginPath();
-  ctx.ellipse(18, 15, 58, 26, 0, 0, Math.PI);
-  ctx.fillStyle = '#9be4f4';
-  ctx.fill();
-
-  // obere Flosse
-  ctx.beginPath();
-  ctx.moveTo(-12, -48);
-  ctx.lineTo(14, -78);
-  ctx.lineTo(35, -44);
-  ctx.closePath();
-  ctx.fillStyle = '#2679b8';
-  ctx.fill();
-
-  // Seitenflosse
-  ctx.beginPath();
-  ctx.moveTo(5, 13);
-  ctx.lineTo(-22, 48);
-  ctx.lineTo(28, 30);
-  ctx.closePath();
-  ctx.fillStyle = '#2679b8';
-  ctx.fill();
-
-  // Auge
-  ctx.beginPath();
-  ctx.arc(54, -13, 10, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(57, -13, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#17242d';
-  ctx.fill();
-
-  // Mund
-  ctx.beginPath();
-  ctx.arc(76, 8, 10, -0.7, 0.7);
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = '#15517f';
-  ctx.stroke();
-
-  // kleine Schuppenpunkte
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  [[-15,-14],[8,-20],[30,1],[-10,12]].forEach(([x,y]) => {
-    ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
-  });
-
-  ctx.restore();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '180px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+  ctx.fillText('🐟', 128, 136);
 
   const texture = new THREE.CanvasTexture(c);
   texture.minFilter = THREE.LinearFilter;
@@ -101,26 +34,29 @@ const fishTargets = fishTargetData.map((d, index) => {
     color: 0xffd34d,
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.78
+    opacity: 0.78,
+    depthWrite: false
   });
   const ring = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.62, 48), ringMat);
   ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.09;
+  ring.position.y = 0.12;
+  ring.renderOrder = 20;
   group.add(ring);
 
   const innerMat = new THREE.MeshBasicMaterial({
     color: 0x7be4ff,
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.22
+    opacity: 0.22,
+    depthWrite: false
   });
   const innerCircle = new THREE.Mesh(new THREE.CircleGeometry(1.22, 48), innerMat);
   innerCircle.rotation.x = -Math.PI / 2;
-  innerCircle.position.y = 0.085;
+  innerCircle.position.y = 0.115;
+  innerCircle.renderOrder = 19;
   group.add(innerCircle);
 
   // Leicht transparenter roter Lichtstrahl als weithin sichtbarer Beacon.
-  // Zwei überlagerte, additive Kegel/Zylinder sorgen für eine weichere Lichtwirkung.
   const beamCoreMat = new THREE.MeshBasicMaterial({
     color: 0xff4b42,
     transparent: true,
@@ -151,19 +87,22 @@ const fishTargets = fishTargetData.map((d, index) => {
   beamGlow.position.y = 8.25;
   group.add(beamGlow);
 
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+  const spriteMat = new THREE.SpriteMaterial({
     map: fishTexture,
     transparent: true,
-    depthTest: false
-  }));
-  sprite.scale.set(1.45, 1.45, 1);
-  sprite.position.y = 1.25;
+    depthTest: false,
+    depthWrite: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(1.9, 1.9, 1);
+  sprite.position.y = 1.55;
+  sprite.renderOrder = 999;
   group.add(sprite);
 
   group.position.set(d.x, 0, d.z);
   group.userData.index = index;
   scene.add(group);
-  return { group, ring, sprite, beamCore, beamGlow, collected: false };
+  return { group, ring, innerCircle, sprite, beamCore, beamGlow, collected: false };
 });
 
 // Wake particles
