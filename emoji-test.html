@@ -11,18 +11,19 @@
   .label{font-weight:800;margin-bottom:10px}.big{font-size:110px;line-height:1;text-align:center;min-height:130px;display:flex;align-items:center;justify-content:center}
   canvas.test{display:block;margin:auto;width:180px;height:180px;border:1px dashed #aac3cf;background:repeating-conic-gradient(#f4f8fa 0 25%,#eaf1f4 0 50%) 0/24px 24px}
   img{display:block;margin:auto;width:180px;height:180px;border:1px dashed #aac3cf;background:repeating-conic-gradient(#f4f8fa 0 25%,#eaf1f4 0 50%) 0/24px 24px}
-  #threeWrap{height:220px;border:1px dashed #aac3cf;background:#44b9e8;border-radius:10px;overflow:hidden}
+  .threeWrap{height:220px;border:1px dashed #aac3cf;background:#44b9e8;border-radius:10px;overflow:hidden}
   pre{white-space:pre-wrap;font-size:12px;background:#f5f7f8;padding:10px;border-radius:10px}
 </style>
 </head>
 <body>
 <h1>🐟 Emoji-Diagnose</h1>
-<p class="note">Bitte von oben nach unten anschauen und einen Screenshot schicken.</p>
+<p class="note">Test 4 ist die aktuell problematische Variante. Entscheidend ist jetzt Test 5.</p>
 <div class="grid">
   <div class="card"><div class="label">1. Normales HTML</div><div class="big">🐟</div></div>
   <div class="card"><div class="label">2. Direktes 2D-Canvas</div><canvas id="c2d" class="test" width="256" height="256"></canvas></div>
   <div class="card"><div class="label">3. Dasselbe Canvas als PNG-Bild</div><img id="pngTest" alt="Canvas als PNG"></div>
-  <div class="card"><div class="label">4. Dasselbe Canvas als Three.js / WebGL-Sprite</div><div id="threeWrap"></div></div>
+  <div class="card"><div class="label">4. Canvas direkt als Three.js / WebGL-Sprite</div><div id="threeWrap" class="threeWrap"></div></div>
+  <div class="card"><div class="label">5. Canvas → PNG → Image → Three.js / WebGL-Sprite</div><div id="threePngWrap" class="threeWrap"></div></div>
   <div class="card"><div class="label">Geräteinfo</div><pre id="info"></pre></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -34,29 +35,52 @@ ctx.textAlign='center';
 ctx.textBaseline='middle';
 ctx.font='180px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 ctx.fillText('🐟',128,136);
-document.getElementById('pngTest').src=c.toDataURL('image/png');
+const pngUrl=c.toDataURL('image/png');
+document.getElementById('pngTest').src=pngUrl;
 
-const wrap=document.getElementById('threeWrap');
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.setSize(wrap.clientWidth,wrap.clientHeight);
-wrap.appendChild(renderer.domElement);
-const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(45,wrap.clientWidth/wrap.clientHeight,0.1,100);
-camera.position.z=5;
-const tex=new THREE.CanvasTexture(c);
-tex.minFilter=THREE.LinearFilter;
-tex.magFilter=THREE.LinearFilter;
-tex.needsUpdate=true;
-const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false});
-const sprite=new THREE.Sprite(mat);
-sprite.scale.set(3,3,1);
-scene.add(sprite);
-renderer.render(scene,camera);
+function makeRenderer(wrap){
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(wrap.clientWidth,wrap.clientHeight);
+  wrap.appendChild(renderer.domElement);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(45,wrap.clientWidth/wrap.clientHeight,0.1,100);
+  camera.position.z=5;
+  return {renderer,scene,camera};
+}
+
+// Test 4: problematische CanvasTexture direkt aus dem Canvas.
+const direct=makeRenderer(document.getElementById('threeWrap'));
+const canvasTex=new THREE.CanvasTexture(c);
+canvasTex.minFilter=THREE.LinearFilter;
+canvasTex.magFilter=THREE.LinearFilter;
+canvasTex.needsUpdate=true;
+const canvasMat=new THREE.SpriteMaterial({map:canvasTex,transparent:true,depthTest:false,depthWrite:false});
+const canvasSprite=new THREE.Sprite(canvasMat);
+canvasSprite.scale.set(3,3,1);
+direct.scene.add(canvasSprite);
+direct.renderer.render(direct.scene,direct.camera);
+
+// Test 5: exakt derselbe Inhalt, aber zuerst als PNG serialisieren,
+// anschließend in ein echtes Image laden und erst daraus die WebGL-Textur bauen.
+const viaPng=makeRenderer(document.getElementById('threePngWrap'));
+const image=new Image();
+image.onload=()=>{
+  const pngTex=new THREE.Texture(image);
+  pngTex.minFilter=THREE.LinearFilter;
+  pngTex.magFilter=THREE.LinearFilter;
+  pngTex.needsUpdate=true;
+  const pngMat=new THREE.SpriteMaterial({map:pngTex,transparent:true,depthTest:false,depthWrite:false});
+  const pngSprite=new THREE.Sprite(pngMat);
+  pngSprite.scale.set(3,3,1);
+  viaPng.scene.add(pngSprite);
+  viaPng.renderer.render(viaPng.scene,viaPng.camera);
+};
+image.src=pngUrl;
 
 let glInfo='';
 try{
-  const gl=renderer.getContext();
+  const gl=direct.renderer.getContext();
   const ext=gl.getExtension('WEBGL_debug_renderer_info');
   if(ext){glInfo='\nGPU: '+gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);}
 }catch(e){}
