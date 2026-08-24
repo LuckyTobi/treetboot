@@ -17,6 +17,13 @@ const camOffset = new THREE.Vector3(0, 4.5, 9);
 const camTarget = new THREE.Vector3();
 const camPos = new THREE.Vector3();
 
+// Eine gemeinsame Wellenfunktion für Wasser, Boot und Fischziele.
+// Dadurch können Boot und Zielmarker nicht mehr unabhängig vom Wasser "versinken".
+function getWaveHeight(worldX, worldZ, time) {
+  return Math.sin(worldX * 0.3 + time) * 0.18
+       + Math.cos(worldZ * 0.25 + time * 1.1) * 0.12;
+}
+
 function updateFishCounter() {
   document.getElementById('fish-counter').textContent = `🐟 ${gs.fishCollected} / 3`;
 }
@@ -74,7 +81,7 @@ function resetMission() {
   fishTargets.forEach(t => { t.collected = false; t.group.visible = true; });
   updateFishCounter();
   updateFishCompass();
-  boatGroup.position.set(0, 0, 0);
+  boatGroup.position.set(0, 0.5, 0);
   boatGroup.rotation.set(0, 0, 0);
   camPos.set(0, 5, 9);
   camTarget.set(0, 0.8, 0);
@@ -186,17 +193,23 @@ function animate(t) {
   lastTime = t;
 
   const time = t * 0.001;
+
+  // Wasser immer aus den ursprünglichen horizontalen Koordinaten berechnen.
+  // So schaukeln sich die Wellen nicht selbst hoch.
   for (let i = 0; i < wPos.count; i++) {
-    const x = wPos.getX(i);
-    const z = wPos.getZ(i);
-    wPos.setZ(i, Math.sin(x * 0.3 + time) * 0.18 + Math.cos(z * 0.25 + time * 1.1) * 0.12);
+    const worldX = wPos.getX(i);
+    const worldZ = -wOrigY[i];
+    wPos.setZ(i, getWaveHeight(worldX, worldZ, time));
   }
   wPos.needsUpdate = true;
   waterGeo.computeVertexNormals();
 
+  // Die Fischziele schwimmen mit der Wasseroberfläche.
   fishTargets.forEach((target, i) => {
     if (!target.group.visible) return;
-    target.sprite.position.y = 1.25 + Math.sin(time * 2.2 + i) * 0.15;
+    const targetWaveY = getWaveHeight(target.group.position.x, target.group.position.z, time);
+    target.group.position.y = targetWaveY + 0.08;
+    target.sprite.position.y = 1.55 + Math.sin(time * 2.2 + i) * 0.12;
     target.ring.material.opacity = 0.64 + Math.sin(time * 3 + i) * 0.16;
     target.group.rotation.y = Math.sin(time * 0.8 + i) * 0.12;
   });
@@ -223,11 +236,14 @@ function animate(t) {
   checkCollisions();
   checkFishTargets();
 
-  boatGroup.position.set(gs.x, 0, gs.z);
+  // Das Boot folgt exakt derselben Wasserhöhe und bekommt einen festen Auftrieb.
+  // Dadurch bleibt der Rumpf sichtbar über der Wasserlinie.
+  const boatWaveY = getWaveHeight(gs.x, gs.z, time);
+  const boatFloatY = boatWaveY + 0.50 + Math.sin(time * 1.5) * 0.025;
+  boatGroup.position.set(gs.x, boatFloatY, gs.z);
   boatGroup.rotation.y = gs.angle;
   boatGroup.rotation.z = Math.sin(time * 1.2) * 0.03;
   boatGroup.rotation.x = Math.cos(time * 0.9) * 0.02;
-  boatGroup.position.y = Math.sin(time * 1.5) * 0.06;
 
   // Nach der Positions- und Richtungsänderung das Fisch-Navi aktualisieren.
   updateFishCompass();
@@ -252,10 +268,10 @@ function animate(t) {
 
   const behindX = gs.x - Math.sin(gs.angle) * camOffset.z;
   const behindZ = gs.z - Math.cos(gs.angle) * camOffset.z;
-  const targetCam = new THREE.Vector3(behindX, camOffset.y, behindZ);
+  const targetCam = new THREE.Vector3(behindX, camOffset.y + boatWaveY, behindZ);
   camPos.lerp(targetCam, 0.07);
   camera.position.copy(camPos);
-  camTarget.lerp(new THREE.Vector3(gs.x, 0.8, gs.z), 0.1);
+  camTarget.lerp(new THREE.Vector3(gs.x, boatFloatY + 0.3, gs.z), 0.1);
   camera.lookAt(camTarget);
 
   const fillEl = document.getElementById('speed-bar-fill');
