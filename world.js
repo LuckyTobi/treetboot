@@ -1,24 +1,28 @@
 // ── FISCH-FELDER ──
-// Einfaches Fisch-Emoji als Sprite. Dadurch ist das Ziel sofort erkennbar
-// und wir brauchen keine separat gezeichnete Fischgrafik mehr.
-function makeFishTexture() {
-  const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 256;
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, 256, 256);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = '180px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
-  ctx.fillText('🐟', 128, 136);
-
-  const texture = new THREE.CanvasTexture(c);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return texture;
+// Das Fischsymbol wird bewusst als normales HTML-Emoji gerendert.
+// Auf manchen Android-/Samsung-Geräten werden transparente Emoji-Texturen
+// in WebGL beschädigt dargestellt. HTML umgeht diesen Grafiktreiber-Bug.
+function createFishHtml(index) {
+  const el = document.createElement('div');
+  el.textContent = '🐟';
+  el.setAttribute('aria-hidden', 'true');
+  el.dataset.fishTarget = String(index);
+  Object.assign(el.style, {
+    position: 'fixed',
+    left: '0px',
+    top: '0px',
+    transform: 'translate(-50%, -50%)',
+    fontSize: '52px',
+    lineHeight: '1',
+    pointerEvents: 'none',
+    userSelect: 'none',
+    zIndex: '18',
+    display: 'none',
+    willChange: 'left, top'
+  });
+  document.body.appendChild(el);
+  return el;
 }
-const fishTexture = makeFishTexture();
 
 // Etwas weiter in der Welt verteilt, aber weiterhin in kurzer Spielzeit erreichbar.
 const fishTargetData = [
@@ -87,22 +91,12 @@ const fishTargets = fishTargetData.map((d, index) => {
   beamGlow.position.y = 8.25;
   group.add(beamGlow);
 
-  const spriteMat = new THREE.SpriteMaterial({
-    map: fishTexture,
-    transparent: true,
-    depthTest: false,
-    depthWrite: false
-  });
-  const sprite = new THREE.Sprite(spriteMat);
-  sprite.scale.set(1.9, 1.9, 1);
-  sprite.position.y = 1.55;
-  sprite.renderOrder = 999;
-  group.add(sprite);
+  const htmlFish = createFishHtml(index);
 
   group.position.set(d.x, 0, d.z);
   group.userData.index = index;
   scene.add(group);
-  return { group, ring, innerCircle, sprite, beamCore, beamGlow, collected: false };
+  return { group, ring, innerCircle, htmlFish, beamCore, beamGlow, collected: false };
 });
 
 // Wake particles
