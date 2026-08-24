@@ -16,6 +16,7 @@ const gs = {
 const camOffset = new THREE.Vector3(0, 4.5, 9);
 const camTarget = new THREE.Vector3();
 const camPos = new THREE.Vector3();
+const fishScreenPos = new THREE.Vector3();
 
 // Eine gemeinsame Wellenfunktion für Wasser, Boot und Fischziele.
 // Dadurch können Boot und Zielmarker nicht mehr unabhängig vom Wasser "versinken".
@@ -30,6 +31,46 @@ function updateFishCounter() {
 
 function getNextFishTarget() {
   return fishTargets.find(t => !t.collected) || null;
+}
+
+// Das HTML-Fisch-Emoji wird an die Bildschirmposition des 3D-Ziels gesetzt.
+// So bleibt der Fisch räumlich an seinem Kreis, wird aber nicht von WebGL gerendert.
+function updateHtmlFishMarkers(time) {
+  camera.updateMatrixWorld();
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  fishTargets.forEach((target, i) => {
+    const el = target.htmlFish;
+    if (!el) return;
+
+    if (target.collected || !target.group.visible) {
+      el.style.display = 'none';
+      return;
+    }
+
+    const bob = 1.55 + Math.sin(time * 2.2 + i) * 0.12;
+    fishScreenPos.set(
+      target.group.position.x,
+      target.group.position.y + bob,
+      target.group.position.z
+    );
+    fishScreenPos.project(camera);
+
+    const onScreen = fishScreenPos.z > -1 && fishScreenPos.z < 1 &&
+                     fishScreenPos.x > -1.15 && fishScreenPos.x < 1.15 &&
+                     fishScreenPos.y > -1.15 && fishScreenPos.y < 1.15;
+
+    if (!onScreen) {
+      el.style.display = 'none';
+      return;
+    }
+
+    const screenX = rect.left + (fishScreenPos.x + 1) * 0.5 * rect.width;
+    const screenY = rect.top + (1 - fishScreenPos.y) * 0.5 * rect.height;
+    el.style.left = `${screenX}px`;
+    el.style.top = `${screenY}px`;
+    el.style.display = 'block';
+  });
 }
 
 // Der runde Anzeige-Kreis oben rechts ist KEIN Nord-Kompass mehr.
@@ -78,7 +119,11 @@ function resetMission() {
   gs.x = 0; gs.z = 0; gs.angle = 0; gs.speed = 0; gs.wheelRot = 0;
   gs.combo = 0; gs.nextExpected = 'left'; gs.started = false;
   gs.missionActive = true; gs.missionDone = false; gs.fishCollected = 0;
-  fishTargets.forEach(t => { t.collected = false; t.group.visible = true; });
+  fishTargets.forEach(t => {
+    t.collected = false;
+    t.group.visible = true;
+    if (t.htmlFish) t.htmlFish.style.display = 'none';
+  });
   updateFishCounter();
   updateFishCompass();
   boatGroup.position.set(0, 0.5, 0);
@@ -92,6 +137,7 @@ function finishMission() {
   gs.missionDone = true;
   gs.missionActive = false;
   gs.speed = 0;
+  fishTargets.forEach(t => { if (t.htmlFish) t.htmlFish.style.display = 'none'; });
   updateFishCompass();
   setTimeout(() => { document.getElementById('success-overlay').style.display = 'flex'; }, 250);
 }
@@ -105,6 +151,7 @@ function checkFishTargets() {
     if (Math.sqrt(dx*dx + dz*dz) < 1.9) {
       t.collected = true;
       t.group.visible = false;
+      if (t.htmlFish) t.htmlFish.style.display = 'none';
       gs.fishCollected++;
       updateFishCounter();
       updateFishCompass();
@@ -209,7 +256,6 @@ function animate(t) {
     if (!target.group.visible) return;
     const targetWaveY = getWaveHeight(target.group.position.x, target.group.position.z, time);
     target.group.position.y = targetWaveY + 0.08;
-    target.sprite.position.y = 1.55 + Math.sin(time * 2.2 + i) * 0.12;
     target.ring.material.opacity = 0.64 + Math.sin(time * 3 + i) * 0.16;
     target.group.rotation.y = Math.sin(time * 0.8 + i) * 0.12;
   });
@@ -273,6 +319,9 @@ function animate(t) {
   camera.position.copy(camPos);
   camTarget.lerp(new THREE.Vector3(gs.x, boatFloatY + 0.3, gs.z), 0.1);
   camera.lookAt(camTarget);
+
+  // Erst nach der endgültigen Kameraposition auf den Bildschirm projizieren.
+  updateHtmlFishMarkers(time);
 
   const fillEl = document.getElementById('speed-bar-fill');
   if (fillEl) fillEl.style.width = Math.round(Math.max(0, gs.speed / gs.maxSpeed) * 100) + '%';
