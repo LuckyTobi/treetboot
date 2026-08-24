@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fisch-Emoji Test</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#eef7fb;margin:0;padding:20px;color:#173042}
+  h1{font-size:24px;margin:0 0 8px}.note{margin:0 0 18px;color:#496372}
+  .grid{display:grid;grid-template-columns:1fr;gap:14px}.card{background:white;border:1px solid #c9dce6;border-radius:16px;padding:16px}
+  .label{font-weight:800;margin-bottom:10px}.big{font-size:110px;line-height:1;text-align:center;min-height:130px;display:flex;align-items:center;justify-content:center}
+  canvas.test{display:block;margin:auto;width:180px;height:180px;border:1px dashed #aac3cf;background:repeating-conic-gradient(#f4f8fa 0 25%,#eaf1f4 0 50%) 0/24px 24px}
+  img{display:block;margin:auto;width:180px;height:180px;border:1px dashed #aac3cf;background:repeating-conic-gradient(#f4f8fa 0 25%,#eaf1f4 0 50%) 0/24px 24px}
+  #threeWrap{height:220px;border:1px dashed #aac3cf;background:#44b9e8;border-radius:10px;overflow:hidden}
+  pre{white-space:pre-wrap;font-size:12px;background:#f5f7f8;padding:10px;border-radius:10px}
+</style>
+</head>
+<body>
+<h1>🐟 Emoji-Diagnose</h1>
+<p class="note">Bitte von oben nach unten anschauen und einen Screenshot schicken.</p>
+<div class="grid">
+  <div class="card"><div class="label">1. Normales HTML</div><div class="big">🐟</div></div>
+  <div class="card"><div class="label">2. Direktes 2D-Canvas</div><canvas id="c2d" class="test" width="256" height="256"></canvas></div>
+  <div class="card"><div class="label">3. Dasselbe Canvas als PNG-Bild</div><img id="pngTest" alt="Canvas als PNG"></div>
+  <div class="card"><div class="label">4. Dasselbe Canvas als Three.js / WebGL-Sprite</div><div id="threeWrap"></div></div>
+  <div class="card"><div class="label">Geräteinfo</div><pre id="info"></pre></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const c=document.getElementById('c2d');
+const ctx=c.getContext('2d');
+ctx.clearRect(0,0,256,256);
+ctx.textAlign='center';
+ctx.textBaseline='middle';
+ctx.font='180px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+ctx.fillText('🐟',128,136);
+document.getElementById('pngTest').src=c.toDataURL('image/png');
+
+const wrap=document.getElementById('threeWrap');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(wrap.clientWidth,wrap.clientHeight);
+wrap.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45,wrap.clientWidth/wrap.clientHeight,0.1,100);
+camera.position.z=5;
+const tex=new THREE.CanvasTexture(c);
+tex.minFilter=THREE.LinearFilter;
+tex.magFilter=THREE.LinearFilter;
+tex.needsUpdate=true;
+const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false});
+const sprite=new THREE.Sprite(mat);
+sprite.scale.set(3,3,1);
+scene.add(sprite);
+renderer.render(scene,camera);
+
+let glInfo='';
+try{
+  const gl=renderer.getContext();
+  const ext=gl.getExtension('WEBGL_debug_renderer_info');
+  if(ext){glInfo='\nGPU: '+gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);}
+}catch(e){}
+document.getElementById('info').textContent=
+  'User-Agent: '+navigator.userAgent+'\n'+
+  'Pixel Ratio: '+devicePixelRatio+'\n'+
+  'Canvas font gesetzt auf: '+ctx.font+glInfo;
+</script>
+</body>
+</html>
